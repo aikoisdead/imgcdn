@@ -1,0 +1,67 @@
+{
+    "id": 718945,
+    "username": "theaikoisdead2",
+    "full_name": "rodrigo guedes",
+    "created_at": "2026-09-01T12:55:33.975Z",
+    "plan_type": "free",
+    "skills": [
+        "coder",
+        "artist",
+        "designer",
+        "musician"
+    ],
+    "email": "limaguedesrodrigo@gmail.com",
+    "tokens": [],
+    "limits": {
+        "diskAllowance": 1000,
+        "maxPrivateProjects": 0,
+        "maxPublicProjects": -1,
+        "awards": []
+    },
+    "flags": {
+        "opened_designer": false,
+        "tips": {
+            "hierarchy": false,
+            "assets": false,
+            "dashboard": false,
+            "entityInspector": false,
+            "mainMenu": false,
+            "launch": false,
+            "controls": false
+        },
+        "openedEditor": true
+    },
+    "plan": "free",
+    "preferences": {
+        "email": {
+            "projects": true,
+            "followedProjects": true,
+            "users": true,
+            "store": true,
+            "comments": true,
+            "stars": true,
+            "general": false,
+            "organizations": true
+        }
+    },
+    "hash": "swyfwa11",
+    "size": {
+        "assets": 9751569,
+        "apps": 2935608,
+        "code": 0,
+        "checkpoints": 10201878,
+        "splats": 0,
+        "total": 22889055
+    },
+    "last_seen": "2026-09-11T19:29:43.082Z",
+    "password": true,
+    "organizations": [
+        {
+            "id": 720144,
+            "username": "xsstestorg1",
+            "full_name": "Test Org",
+            "plan": "free",
+            "plan_type": "free"
+        }
+    ]
+}
